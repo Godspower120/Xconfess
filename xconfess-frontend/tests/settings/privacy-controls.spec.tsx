@@ -321,4 +321,26 @@ describe("PrivacySettingsPage", () => {
     expect(screen.getByRole("button", { name: /save privacy settings/i })).toBeDisabled();
     expect(discoveryToggle).toHaveAttribute("aria-checked", "true");
   });
+
+  it("records and displays user-visible privacy settings change history after saving (#360)", async () => {
+    const user = userEvent.setup();
+    render(<PrivacySettingsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Profile Discovery")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("Privacy Settings Change History")).toBeInTheDocument();
+
+    const discoveryToggle = screen.getAllByRole("switch")[0];
+    await user.click(discoveryToggle);
+    await user.click(screen.getByRole("button", { name: /save privacy settings/i }));
+    await confirmStepUp(user);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("region", { name: /privacy settings change history/i }),
+      ).toHaveTextContent("1 control updated");
+    });
+  });
 });
