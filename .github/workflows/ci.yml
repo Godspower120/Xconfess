@@ -117,6 +117,27 @@ jobs:
       - name: Test data classification gate
         run: node --test scripts/__tests__/data-classification-gate.test.js
 
+  # ── Module map staleness (issue #464) ────────────────────────────────────
+  # Regenerates the contributor module map from .github/CODEOWNERS and the
+  # repository layout, then fails if the committed artifact is out of date.
+  # See docs/MODULE_MAP.md.
+  module-map:
+    name: Docs / module map
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm install --global npm@10.9.3
+      - run: npm ci --include=optional --no-audit --no-fund
+      - name: Run module map generator tests
+        run: npm run module-map:test
+      - name: Verify module map is not stale
+        run: npm run module-map:check
+
   doc-link-audit:
     name: Docs / link audit
     runs-on: ubuntu-latest
