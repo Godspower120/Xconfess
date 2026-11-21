@@ -410,6 +410,8 @@ export const EnhancedConfessionForm: React.FC<EnhancedConfessionFormProps> = ({
                   variant="outline"
                   size="sm"
                   onClick={() => setIsPreviewMode(!isPreviewMode)}
+                  aria-pressed={isPreviewMode}
+                  aria-controls="confession-preview-region"
                   aria-label={
                     isPreviewMode
                       ? "Switch to edit mode"
@@ -434,8 +436,32 @@ export const EnhancedConfessionForm: React.FC<EnhancedConfessionFormProps> = ({
             </div>
 
             {isPreviewMode ? (
-              <div tabIndex={0} role="region" aria-label="Confession preview">
-                <PreviewPanel title={title} body={body} />
+              <div
+                id="confession-preview-region"
+                tabIndex={0}
+                role="region"
+                aria-label="Confession preview"
+                aria-live="polite"
+                className="space-y-3"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-800/60 bg-emerald-950/30 px-4 py-2.5 text-xs text-emerald-200">
+                  <span>
+                    Anonymous Post Preview — Your username and account metadata are never attached to this post.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setIsPreviewMode(false)}
+                    className="font-medium text-emerald-300 underline underline-offset-4 hover:text-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 rounded"
+                  >
+                    Return to editor
+                  </button>
+                </div>
+                <PreviewPanel
+                  title={title}
+                  body={body}
+                  gender={gender}
+                  enableStellarAnchor={enableStellarAnchor}
+                />
               </div>
             ) : (
               <>

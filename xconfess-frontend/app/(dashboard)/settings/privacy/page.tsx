@@ -6,11 +6,13 @@ import {
   ArrowRight,
   Bell,
   BellOff,
+  Clock,
   Database,
   Eye,
   EyeOff,
   ExternalLink,
   Globe,
+  History,
   Info,
   Laptop,
   Layers,
@@ -21,6 +23,7 @@ import {
   Save,
   Shield,
   Sun,
+  Trash2,
 } from 'lucide-react';
 import { useGlobalToast } from '@/app/components/common/Toast';
 import StepUpModal from '@/app/components/admin/StepUpModal';
@@ -29,9 +32,13 @@ import { normalizeApiError } from '@/app/lib/api/errors';
 import { stepUpHeader } from '@/app/lib/api/stepUp';
 import { useTheme } from '@/app/lib/hooks/useTheme';
 import {
+  appendPrivacySettingsHistory,
+  clearPrivacySettingsHistory,
+  loadPrivacySettingsHistory,
   mergePrivacySettingsAfterConflict,
   PRIVACY_SETTING_KEYS,
   type PrivacySettings,
+  type PrivacySettingsHistoryEntry,
 } from '@/app/lib/utils/privacySettings';
 
 interface ToggleProps {
@@ -178,10 +185,15 @@ export default function PrivacySettingsPage() {
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
+  const [changeHistory, setChangeHistory] = useState<PrivacySettingsHistoryEntry[]>([]);
   const savedSettingsRef = useRef<PrivacySettings | null>(null);
   const saveInFlightRef = useRef(false);
   const toast = useGlobalToast();
   const stepUp = useStepUp();
+
+  useEffect(() => {
+    setChangeHistory(loadPrivacySettingsHistory());
+  }, []);
 
   const loadSettings = useCallback(async () => {
     setLoading(true);
@@ -290,6 +302,13 @@ export default function PrivacySettingsPage() {
           'contentWarningsCollapsed',
           String(updated.contentWarningsCollapsed),
         );
+      }
+      if (savedSettingsRef.current) {
+        const updatedHistory = appendPrivacySettingsHistory(
+          savedSettingsRef.current,
+          updated,
+        );
+        setChangeHistory(updatedHistory);
       }
       savedSettingsRef.current = updated;
       setSettings(updated);
@@ -430,7 +449,12 @@ export default function PrivacySettingsPage() {
 
       {/* Privacy Controls Grouped by Data Flow */}
       {DATA_FLOW_GROUPS.map((group) => {
-        const groupConfigs = TOGGLE_CONFIGS.filter((c) => c.dataFlow === group.id);
+        const groupConfigs = TOGGLE_CONFIGS.filter(
+          (c) =>
+            c.dataFlow === group.id &&
+            (c.key !== 'contentWarningsCollapsed' ||
+              typeof settings.contentWarningsCollapsed === 'boolean'),
+        );
         if (groupConfigs.length === 0) return null;
 
         return (
@@ -559,6 +583,86 @@ export default function PrivacySettingsPage() {
           ))}
         </div>
       </div>
+
+      {/* User-Visible Privacy Settings Change History */}
+      <section
+        aria-label="Privacy settings change history"
+        className="bg-gray-800 rounded-lg mb-6 p-4 border border-gray-700/60"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+          <div>
+            <h2 className="font-semibold text-white flex items-center gap-2">
+              <History className="h-5 w-5 text-purple-400" />
+              Privacy Settings Change History
+            </h2>
+            <p className="text-sm text-gray-400 mt-0.5">
+              Audit trail of verified changes to your privacy controls on this device.
+            </p>
+          </div>
+          {changeHistory.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                clearPrivacySettingsHistory();
+                setChangeHistory([]);
+              }}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-700 bg-gray-900/60 px-3 py-1.5 text-xs font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Clear History
+            </button>
+          )}
+        </div>
+
+        {changeHistory.length === 0 ? (
+          <p className="text-xs text-gray-400 italic py-2">
+            No privacy setting changes recorded yet. Saved updates will appear here with timestamps.
+          </p>
+        ) : (
+          <ol className="space-y-2.5" aria-label="Recorded privacy setting transitions">
+            {changeHistory.map((entry) => (
+              <li
+                key={entry.id}
+                className="rounded-lg border border-gray-700 bg-gray-900/50 px-3.5 py-2.5 text-xs"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2 text-gray-400 mb-1.5">
+                  <span className="inline-flex items-center gap-1 font-medium text-purple-300">
+                    <Clock className="h-3 w-3" />
+                    {new Date(entry.timestamp).toLocaleString()}
+                  </span>
+                  <span>
+                    {entry.changes.length}{' '}
+                    {entry.changes.length === 1 ? 'control updated' : 'controls updated'}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {entry.changes.map((change) => (
+                    <span
+                      key={`${entry.id}-${change.key}`}
+                      className="inline-flex items-center gap-1 rounded bg-gray-800 border border-gray-700 px-2 py-0.5 text-gray-200"
+                    >
+                      <span className="font-medium text-white">{change.label}:</span>
+                      <span className="text-gray-400">
+                        {change.from ? 'ON' : 'OFF'}
+                      </span>
+                      <ArrowRight className="h-3 w-3 text-gray-500" />
+                      <span
+                        className={
+                          change.to
+                            ? 'text-green-400 font-semibold'
+                            : 'text-amber-300 font-semibold'
+                        }
+                      >
+                        {change.to ? 'ON' : 'OFF'}
+                      </span>
+                    </span>
+                  ))}
+                </div>
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
 
       {/* Action Buttons */}
       <div className="space-y-3">

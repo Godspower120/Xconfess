@@ -3,6 +3,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { ConfessionSchedulerService } from './confession-scheduler.service';
 import { AnonymousConfession } from './entities/confession.entity';
+import { DeterministicClock } from '../../test/deterministic/deterministic-fixtures';
 
 describe('ConfessionSchedulerService', () => {
   let service: ConfessionSchedulerService;
@@ -90,6 +91,35 @@ describe('ConfessionSchedulerService', () => {
         'status = :status',
         { status: 'scheduled' },
       );
+    });
+
+    it('uses the controlled instant for due selection and publication timestamps', async () => {
+      const clock = new DeterministicClock('2026-09-24T10:00:00.000Z');
+      clock.freeze();
+      queryBuilder.getMany.mockResolvedValue([
+        {
+          id: 'conf-deterministic',
+          status: 'scheduled',
+          publishAt: new Date('2026-09-24T09:59:00.000Z'),
+        },
+      ] as AnonymousConfession[]);
+      updateBuilder.execute.mockResolvedValue({ affected: 1 });
+
+      try {
+        await service.publishScheduledConfessions();
+
+        const now = new Date('2026-09-24T10:00:00.000Z');
+        expect(queryBuilder.andWhere).toHaveBeenCalledWith(
+          'confession.publishAt <= :now',
+          { now },
+        );
+        expect(updateBuilder.set).toHaveBeenCalledWith({
+          status: 'published',
+          created_at: now,
+        });
+      } finally {
+        clock.restore();
+      }
     });
 
     it('skips confessions already published by a concurrent run (affected: 0)', async () => {
