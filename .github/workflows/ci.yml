@@ -44,6 +44,43 @@ jobs:
       - run: npm ci
       - run: npm run frontend:test
 
+  frontend-browser-matrix:
+    name: Frontend browser matrix (${{ matrix.project }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - browser: chromium
+            project: critical-chromium
+          - browser: firefox
+            project: critical-firefox
+          - browser: webkit
+            project: critical-webkit
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      - name: Install ${{ matrix.browser }}
+        run: npx playwright install --with-deps ${{ matrix.browser }}
+      - name: Run critical frontend journeys
+        working-directory: xconfess-frontend
+        run: npx playwright test --project=${{ matrix.project }}
+      - name: Upload browser failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-${{ matrix.project }}
+          path: |
+            xconfess-frontend/test-results
+            xconfess-frontend/playwright-report
+          if-no-files-found: ignore
+          retention-days: 7
+
   secret-scan:
     name: Security / Secret Scan
     runs-on: ubuntu-latest
