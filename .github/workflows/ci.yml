@@ -44,6 +44,34 @@ jobs:
       - run: npm ci
       - run: npm run frontend:test
 
+  # ── Startup budget (issue #462) ──────────────────────────────────────────
+  # Measures backend and frontend cold-start phases against documented
+  # budgets and fails the build on regression. See docs/STARTUP_BUDGET.md.
+  startup-budget:
+    name: Performance / Startup budget
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm install --global npm@10.9.3
+      - run: npm ci --include=optional --no-audit --no-fund
+      - name: Run startup budget harness tests
+        run: npm run benchmark:triage:test
+      - name: Enforce frontend startup budget
+        run: npm run frontend:budget
+      - name: Retain startup budget report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: startup-budget-report
+          path: startup-budget-report.json
+          if-no-files-found: warn
+          retention-days: 90
+
   secret-scan:
     name: Security / Secret Scan
     runs-on: ubuntu-latest
@@ -88,6 +116,27 @@ jobs:
           src/moderation/language-evaluation.service.spec.ts
       - name: Test data classification gate
         run: node --test scripts/__tests__/data-classification-gate.test.js
+
+  # ── Module map staleness (issue #464) ────────────────────────────────────
+  # Regenerates the contributor module map from .github/CODEOWNERS and the
+  # repository layout, then fails if the committed artifact is out of date.
+  # See docs/MODULE_MAP.md.
+  module-map:
+    name: Docs / module map
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm install --global npm@10.9.3
+      - run: npm ci --include=optional --no-audit --no-fund
+      - name: Run module map generator tests
+        run: npm run module-map:test
+      - name: Verify module map is not stale
+        run: npm run module-map:check
 
   doc-link-audit:
     name: Docs / link audit
